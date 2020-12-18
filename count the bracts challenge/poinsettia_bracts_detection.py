@@ -27,6 +27,7 @@ import sys
 
 
 root_path = ''
+#Change this path to unseen data if you want to get output for new images
 test_data_dir = 'test'
 
 def collate_fn(batch):
@@ -81,6 +82,7 @@ class RandomHorizontalFlip(object):
 
 
 class ToTensor(object):
+    """https://github.com/pytorch/vision/blob/master/references/detection/transforms.py"""
     def __call__(self, image, target):
         image = F.to_tensor(image)
         return image, target
@@ -128,12 +130,13 @@ class PoinsettiaDataset(object):
             iscrowd_tensor.append(each['iscrowd'])
             #Only 1 class
             label_tensor.append(1)
-
+    #Cast to Tensors, store in Dict
     target['boxes'] = torch.Tensor(box_tensor)
     target['image_id'] = torch.Tensor([int(img_id) for _ in range(len(self.imgs))])
     target['labels'] = torch.Tensor(label_tensor)
     target['labels'] = target['labels'].type(torch.int64)
     target['iscrowd'] = torch.Tensor(iscrowd_tensor)
+    #Create masks
     target['masks'] = self.create_mask(img, target['boxes']) if self.train else torch.Tensor([])
 
     #Apply Transformations
@@ -146,14 +149,17 @@ class PoinsettiaDataset(object):
     return len(self.imgs)
     
   def create_mask(self, img, boxes):
-    #Creates a mask of the image
+    #Creates a mask of the image for each bract
     rows,cols = img.size
     masks = []
     for box in boxes:
+      #Fully black image
       boxed_mask = np.zeros((rows,cols))
+      #Get box dimensions and location
       xmin,ymin = int(box[0].item()), int(box[1].item())      
       xmax = int(box[2].item())
       ymax = int(box[3].item())
+      #Fill box in as white
       boxed_mask[xmin:xmax, ymin:ymax] = 1
       masks.append(boxed_mask)
     masks = torch.Tensor(masks)
@@ -186,33 +192,43 @@ def get_transforms(train):
   return Compose(transforms)
 
 def main(mode):
+  """Main Method
+  |mode: train: will train a new network, then test performance
+         test: will load network and test performance
+  """
+  #Load to GPU
   device = torch.device('cuda')   if torch.cuda.is_available() else torch.device('cpu')
+  #2 classes, Bract or Background
   num_classes = 2
+  #Create dataset object
   dataset = PoinsettiaDataset(root_path, 'train', get_transforms(True))
-  #Change this path to unseen data if you want to get output for new images
+  #Test dataset object
   dataset_test = PoinsettiaDataset(root_path, test_data_dir, get_transforms(False), train=False)
+  #Create dataloaders
   dataloader = torch.utils.data.DataLoader(dataset, batch_size=2,shuffle=True,num_workers=4,collate_fn=collate_fn)
   dataloader_test = torch.utils.data.DataLoader(dataset_test, batch_size=1,shuffle=False,num_workers=4,collate_fn=collate_fn)
+  #Generate model
   model = get_model_instance_segmentation(num_classes)
   model.to(device)
   if mode=='train':  
     params = [p for p in model.parameters() if p.requires_grad]
+    #Stochastic Gradient Descent Optimiser
     optimiser = torch.optim.SGD(params, lr=0.005, momentum=0.9,weight_decay=0.0005)
 
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimiser, step_size=3,gamma=0.1)
     num_epochs = 25
-
-    mean_train_loss_per_epoch = []
 
     for epoch in range(num_epochs):
       model.train()
       loss_ = 0
       length = 0
       for i, data in enumerate(dataloader):
+        #get images and labels for this batch
         images, targets = data[0], data[1]
         images = list(image.to(device) for image in images)
         targets = [{k:v.to(device) for k, v in t.items()} for t in targets]
+        #Get network predictions
         loss_dict = model(images, targets)
+        #Calculate loss
         losses = sum(loss for loss in loss_dict.values())
         loss_value = losses.item()
         loss_ += loss_value
@@ -220,38 +236,50 @@ def main(mode):
         if not math.isfinite(loss_value):
           print("loss is {}, stopping training".format(loss_value))
           sys.exit(1)
+        #Backward Propogate
         optimiser.zero_grad()
         losses.backward()
         optimiser.step()
+      #Save network  
       print("Epoch %d : Training Loss: %.3f" % (epoch,loss_/length))
       torch.save(model, os.path.join(root_path, "poinsettia_frcnn" + str(epoch)))
       torch.save(model.state_dict(), os.path.join(root_path, "poinsettia_frcnn_state_dict" + str(epoch)))
   elif mode=='test':
+    #Load network
     model.load_state_dict(torch.load(os.path.join(root_path, "poinsettia_frcnn_state_dict19")))
     
   with torch.no_grad():
+    #Testing loop
     model.eval()
     predictions = []
     id = 0 
     for j, test_data in enumerate(dataloader_test):
+      #Load images, target_data
       images, targets = test_data[0], test_data[1]
       images = list(image.to(device) for image in images)
       targets = [{k:v.to(device) for k, v in t.items()} for t in targets]
+      #Get predictions
       outputs = model(images)
+      #Show images
       fig,ax = plt.subplots(1)
       imgs = images[0].detach().cpu()
       imgs = np.array(imgs)
       imgs = np.transpose(imgs, (2, 1, 0))
-      ax.imshow(imgs)
       out = outputs
       imgid = int(targets[0]['image_id'][0].item())
       for i,each in enumerate(out[0]['boxes']):
+        #Get predictions and save them in correct format
         each = each.detach().cpu()
         width = int(each[2]-each[0])
         height = int(each[3]-each[1])
-        pred = {"id":id,"image_id":imgid, "category_id":1, "bbox":[int(each[0].item()), int(each[1].item()), width, height], "area":float(width*height), "iscrowd":0}
+        bbox = [int(each[0].item()), int(each[1].item()), width, height]
+        pred = {"id":id,"image_id":imgid, "category_id":1, "bbox":bbox, "area":float(width*height), "iscrowd":0}
         predictions.append(pred)
+        rect = patches.Rectangle((bbox[0], bbox[1]), width, height, linewidth=1,edgecolor='r',facecolor='none')    
+        ax.add_patch(rect)
         id += 1
+      ax.imshow(imgs)
+  #Save final predictions
   outp = {"annotations":predictions}
   print(outp)
   with open(os.path.join(root_path,'output.json'), 'w') as f:
