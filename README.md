@@ -48,7 +48,7 @@
 <img src="images/IMG204.jpg" alt="Logo" width="800" height="600">
 </p>
 
-This project was created in conjunciton with the poinsettia-hackathon event held by LAR and AgriForwards.
+This project was created in conjunciton with the <a href=https://lar.lincoln.ac.uk/poinsettia-challenge/>poinsettia-hackathon</a> event held by LAR and AgriForwards, and won 1st place in the bract counting challenge (poinsetta\_bracts\_detection.py)
 
 ### Built With
 
