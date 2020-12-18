@@ -48,7 +48,7 @@
 <img src="images/IMG204.jpg" alt="Logo" width="800" height="600">
 </p>
 
-This project was created in conjunciton with the <a href=https://lar.lincoln.ac.uk/poinsettia-challenge/>poinsettia-hackathon</a> event held by LAR and AgriForwards, and won 1st place in the bract counting challenge (with the <a href=https://github.com/Jack742/Poinsettia-Vision-Challenge/blob/main/poinsettia_bracts_detection.py>Faster-RCNN</a>) Entry.
+This project was created in conjunciton with the <a href=https://lar.lincoln.ac.uk/poinsettia-challenge/>poinsettia-hackathon</a> event held by LAR and AgriForwards, and won 1st place in the bract counting challenge (with the <a href=https://github.com/Jack742/Poinsettia-Vision-Challenge/blob/main/poinsettia_bracts_detection.py>Faster-RCNN</a> entry).
 
 ### Built With
 
