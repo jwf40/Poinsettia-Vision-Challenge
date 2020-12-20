@@ -95,3 +95,8 @@ Jack Foster - [Github](https://github.com/Jack742)
 Roopika Ravikanna - [Github](https://github.com/PikaRoooo)
 
 Harry Rogers - [Github](https://github.com/Harry-Rogers)
+
+
+## Results
+
+The poinsettia_bracts_detection py file won the challenge to find the most bracts in an image. Written by Jack Foster [Github](https://github.com/Jack742)
